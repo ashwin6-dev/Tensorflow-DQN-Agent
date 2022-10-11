@@ -30,7 +30,7 @@ class DQN:
             tf.keras.layers.Dense(128, activation="relu"),
             tf.keras.layers.Dense(64, activation="relu"),
             tf.keras.layers.Dense(32, activation="relu"),
-            tf.keras.layers.Dense(self.action_n, activation="linear"),
+            tf.keras.layers.Dense(self.action_n),
         ])
 
         model.compile(loss=HuberLoss(0, 1), optimizer=tf.keras.optimizers.Adam(0.0001))
