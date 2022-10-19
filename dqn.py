@@ -1,7 +1,6 @@
 import numpy as np
 import tensorflow as tf
 import random
-import keras.backend as K
 from matplotlib import pyplot as plt
 
 def build_dense_policy_nn():
