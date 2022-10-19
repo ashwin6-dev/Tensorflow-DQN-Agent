@@ -4,38 +4,29 @@ import random
 import keras.backend as K
 from matplotlib import pyplot as plt
 
-def HuberLoss(mask_value, clip_delta):
-  def f(y_true, y_pred):
-    error = y_true - y_pred
-    cond  = K.abs(error) < clip_delta
-    mask_true = K.cast(K.not_equal(y_true, mask_value), K.floatx())
-    masked_squared_error = 0.5 * K.square(mask_true * (y_true - y_pred))
-    linear_loss  = mask_true * (clip_delta * K.abs(error) - 0.5 * (clip_delta ** 2))
-    huber_loss = tf.where(cond, masked_squared_error, linear_loss)
-    return K.sum(huber_loss) / K.sum(mask_true)
-  f.__name__ = 'masked_huber_loss'
-  return f
-
-class DQN:
-    def __init__(self, action_n):
-        self.action_n = action_n
-        self.policy = self.build_model()
-        self.target = self.build_model()
-        self.replay = []
-        self.max_replay_size = 10000
-
-    def build_model(self):
+def build_dense_policy_nn():
+    def f(action_n):
         model = tf.keras.models.Sequential([
-            tf.keras.layers.Dense(256, activation="relu"),
-            tf.keras.layers.Dense(128, activation="relu"),
-            tf.keras.layers.Dense(64, activation="relu"),
-            tf.keras.layers.Dense(32, activation="relu"),
-            tf.keras.layers.Dense(self.action_n),
-        ])
+                tf.keras.layers.Dense(256, activation="relu"),
+                tf.keras.layers.Dense(128, activation="relu"),
+                tf.keras.layers.Dense(64, activation="relu"),
+                tf.keras.layers.Dense(32, activation="relu"),
+                tf.keras.layers.Dense(action_n, activation="linear"),
+            ])
 
-        model.compile(loss=HuberLoss(0, 1), optimizer=tf.keras.optimizers.Adam(0.0001))
+        model.compile(loss=tf.keras.losses.MeanSquaredError(), optimizer=tf.keras.optimizers.Adam(0.0001))
 
         return model
+
+    return f
+
+class DQN:
+    def __init__(self, action_n, model):
+        self.action_n = action_n
+        self.policy = model(action_n)
+        self.target = model(action_n)
+        self.replay = []
+        self.max_replay_size = 10000
 
     def play_episode(self, env, epsilon, max_timesteps):
 
@@ -49,7 +40,7 @@ class DQN:
             if rand <= epsilon:
                 action = env.action_space.sample()
             else:
-                actions = self.policy(np.array([obs])).numpy()
+                actions = self.policy(np.array([obs]).astype(float)).numpy()
                 action = np.argmax(actions)
 
             new_obs, reward, done, _ = env.step(action)
@@ -72,7 +63,7 @@ class DQN:
         max_episode_timesteps = 1000
         episodes = 1
         epsilon = 1
-        decay = np.e ** (np.log(min_epsilon) / (timesteps))
+        decay = np.e ** (np.log(min_epsilon) / (timesteps * 0.85))
         steps = 0
 
         episode_list = []
@@ -128,16 +119,16 @@ class DQN:
 
 
     def play(self, env):
-
         for _ in range(10):
             obs = env.reset()
             done = False
 
             while not done:
-                rand = np.random.uniform(0, 1)
-
-                actions = self.policy(np.array([obs])).numpy()
+                actions = self.policy(np.array([obs]).astype(float)).numpy()
                 action = np.argmax(actions)
-
                 obs, _, done, _ = env.step(action)
                 env.render()
+
+    def load(self, path):
+      m = tf.keras.models.load_model(path)
+      self.policy = m
