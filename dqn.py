@@ -26,6 +26,7 @@ class DQN:
         self.target = model(action_n)
         self.replay = []
         self.max_replay_size = 10000
+        self.weights_initialised = False
 
     def play_episode(self, env, epsilon, max_timesteps):
 
@@ -42,9 +43,13 @@ class DQN:
                 actions = self.policy(np.array([obs]).astype(float)).numpy()
                 action = np.argmax(actions)
 
+                if not self.weights_initialised:
+                    self.target.set_weights(self.policy.get_weights())
+                    self.weights_initialised = True
+
             new_obs, reward, done, _ = env.step(action)
-            if len(self.replay) == self.max_replay_size:
-                self.replay = self.replay[1:]
+            if len(self.replay) >= self.max_replay_size:
+                self.replay = self.replay[(len(self.replay) - self.max_replay_size) + 1:]
                 
             self.replay.append([obs, action, reward, new_obs, done])
             rewards += reward
@@ -58,7 +63,7 @@ class DQN:
                 break
 
 
-    def learn(self, env, timesteps, train_every = 5, update_target_every = 25, show_every_episode = 4, batch_size = 64, discount = 0.8, min_epsilon = 0.05, min_reward=150):
+    def learn(self, env, timesteps, train_every = 5, update_target_every = 50, show_every_episode = 4, batch_size = 64, discount = 0.8, min_epsilon = 0.05, min_reward=150):
         max_episode_timesteps = 1000
         episodes = 1
         epsilon = 1
@@ -106,11 +111,11 @@ class DQN:
                 print ("episode length: ", ep_len)
                 print ("timesteps done: ", steps)
 
-                episode_list.append(episodes)
-                rewards_list.append(rewards)
-
                 if rewards > min_reward:
                     self.policy.save(f"policy-model-{rewards}")
+            
+            episode_list.append(episodes)
+            rewards_list.append(rewards)
         
         self.policy.save("policy-model-final")
         plt.plot(episode_list, rewards_list)
